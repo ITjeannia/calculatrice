@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    Page unique de la calculatrice. Layouts utilisés simultanément :
+      1. Grid                  : structure de la page (portrait / paysage) et pavé numérique 4 × 5.
+      2. Border                : cartes arrondies de l'écran d'affichage et du panneau d'historique.
+      3. VerticalStackLayout   : empilement opération / résultat et liste de l'historique.
+      4. HorizontalStackLayout : barre d'en-tête (titre, boutons f(x) et Historique).
+      5. ScrollView            : défilement de l'opération trop longue et de l'historique.
+      6. FlexLayout            : rangée de fonctions avancées répartie en parts égales sur toute la largeur.
+-->
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:core="clr-namespace:Calculatrice.Core;assembly=Calculatrice.Core"
+             x:Class="Calculatrice.MainPage"
+             Title="Calculatrice"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="{StaticResource CalcBackground}"
+             SizeChanged="OnPageSizeChanged">
+
+    <ContentPage.Resources>
+        <Color x:Key="CalcBackground">#0F1115</Color>
+        <Color x:Key="CalcSurface">#1A1D24</Color>
+        <Color x:Key="CalcDigit">#262A33</Color>
+        <Color x:Key="CalcFunction">#3A3F4B</Color>
+        <Color x:Key="CalcOperator">#33291A</Color>
+        <Color x:Key="CalcAccent">#FF9F0A</Color>
+        <Color x:Key="CalcText">#F5F6F8</Color>
+        <Color x:Key="CalcMuted">#8B919E</Color>
+
+        <Style x:Key="KeyBase" TargetType="Button">
+            <Setter Property="FontFamily" Value="OpenSansSemibold" />
+            <Setter Property="FontSize" Value="26" />
+            <Setter Property="TextColor" Value="{StaticResource CalcText}" />
+            <Setter Property="CornerRadius" Value="20" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="BorderWidth" Value="0" />
+            <Setter Property="MinimumHeightRequest" Value="0" />
+            <Setter Property="MinimumWidthRequest" Value="0" />
+        </Style>
+        <Style x:Key="DigitKey" TargetType="Button" BasedOn="{StaticResource KeyBase}">
+            <Setter Property="BackgroundColor" Value="{StaticResource CalcDigit}" />
+        </Style>
+        <Style x:Key="FunctionKey" TargetType="Button" BasedOn="{StaticResource KeyBase}">
+            <Setter Property="BackgroundColor" Value="{StaticResource CalcFunction}" />
+        </Style>
+        <Style x:Key="OperatorKey" TargetType="Button" BasedOn="{StaticResource KeyBase}">
+            <Setter Property="BackgroundColor" Value="{StaticResource CalcOperator}" />
+            <Setter Property="TextColor" Value="{StaticResource CalcAccent}" />
+        </Style>
+        <Style x:Key="EqualsKey" TargetType="Button" BasedOn="{StaticResource KeyBase}">
+            <Setter Property="BackgroundColor" Value="{StaticResource CalcAccent}" />
+            <Setter Property="TextColor" Value="{StaticResource CalcBackground}" />
+        </Style>
+        <Style x:Key="ScienceKey" TargetType="Button" BasedOn="{StaticResource KeyBase}">
+            <Setter Property="BackgroundColor" Value="{StaticResource CalcSurface}" />
+            <Setter Property="TextColor" Value="{StaticResource CalcAccent}" />
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="HeightRequest" Value="44" />
+            <Setter Property="Margin" Value="3" />
+            <Setter Property="FlexLayout.Basis" Value="20%" />
+        </Style>
+        <Style x:Key="PillButton" TargetType="Button">
+            <Setter Property="FontFamily" Value="OpenSansSemibold" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="TextColor" Value="{StaticResource CalcText}" />
+            <Setter Property="BackgroundColor" Value="{StaticResource CalcSurface}" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="HeightRequest" Value="34" />
+            <Setter Property="MinimumHeightRequest" Value="0" />
+            <Setter Property="Padding" Value="14,0" />
+            <Setter Property="BorderWidth" Value="0" />
+        </Style>
+    </ContentPage.Resources>
+
+    <!-- Les lignes / colonnes sont définies dans le code-behind selon l'orientation (ApplyLayout). -->
+    <Grid x:Name="RootGrid" Padding="16,12,16,16" RowSpacing="12" ColumnSpacing="16">
+
+        <!-- En-tête -->
+        <Grid x:Name="HeaderBar" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <HorizontalStackLayout Spacing="10" VerticalOptions="Center">
+                <Border WidthRequest="12" HeightRequest="12" StrokeThickness="0"
+                        BackgroundColor="{StaticResource CalcAccent}" StrokeShape="RoundRectangle 6"
+                        VerticalOptions="Center" />
+                <Label x:Name="TitleLabel" Text="Calculatrice" FontFamily="OpenSansSemibold" FontSize="20"
+                       TextColor="{StaticResource CalcText}" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+            <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                <Button x:Name="ScienceToggle" Text="f(x)" Style="{StaticResource PillButton}"
+                        BackgroundColor="{StaticResource CalcFunction}"
+                        Clicked="OnScienceToggled"
+                        SemanticProperties.Description="Afficher ou masquer les fonctions avancées" />
+                <Button x:Name="HistoryToggle" Text="Historique" Style="{StaticResource PillButton}"
+                        Clicked="OnHistoryToggled" />
+            </HorizontalStackLayout>
+        </Grid>
+
+        <!-- Écran : opération en cours au-dessus du résultat -->
+        <Border x:Name="DisplayCard" BackgroundColor="{StaticResource CalcSurface}" StrokeThickness="0"
+                StrokeShape="RoundRectangle 24" Padding="20,14" MinimumHeightRequest="96"
+                SizeChanged="OnDisplaySizeChanged">
+            <VerticalStackLayout x:Name="DisplayStack" Spacing="4" VerticalOptions="End">
+                <ScrollView x:Name="ExpressionScroll" Orientation="Horizontal"
+                            HorizontalScrollBarVisibility="Never" SizeChanged="OnExpressionScrollSizeChanged">
+                    <Label x:Name="ExpressionLabel" Text=" " FontSize="20" LineBreakMode="NoWrap"
+                           TextColor="{StaticResource CalcMuted}" HorizontalTextAlignment="End"
+                           SemanticProperties.Description="Opération en cours" />
+                </ScrollView>
+                <Label x:Name="ResultLabel" Text="0" FontFamily="OpenSansSemibold" FontSize="64"
+                       TextColor="{StaticResource CalcText}" HorizontalTextAlignment="End"
+                       LineBreakMode="HeadTruncation" MaxLines="1"
+                       SemanticProperties.Description="Résultat" />
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- Fonctions avancées : cinq parts égales (Basis 20 %) qui occupent toute la largeur, quel que soit l'écran -->
+        <FlexLayout x:Name="SciencePanel" Direction="Row" Wrap="NoWrap" JustifyContent="SpaceBetween"
+                    AlignItems="Center" Margin="-3,0">
+            <Button Text="√x" Style="{StaticResource ScienceKey}" Clicked="OnFunctionClicked" CommandParameter="sqrt"
+                    SemanticProperties.Description="Racine carrée" />
+            <Button Text="x²" Style="{StaticResource ScienceKey}" Clicked="OnFunctionClicked" CommandParameter="square"
+                    SemanticProperties.Description="Carré" />
+            <Button Text="x^y" Style="{StaticResource ScienceKey}" Clicked="OnOperatorClicked" CommandParameter="^"
+                    SemanticProperties.Description="Puissance" />
+            <Button Text="1/x" Style="{StaticResource ScienceKey}" Clicked="OnFunctionClicked" CommandParameter="inverse"
+                    SemanticProperties.Description="Inverse" />
+            <Button Text="π" Style="{StaticResource ScienceKey}" Clicked="OnPiClicked"
+                    SemanticProperties.Description="Pi" />
+        </FlexLayout>
+
+        <!-- Pavé numérique : 4 colonnes × 5 lignes proportionnelles, il occupe toujours tout l'espace disponible -->
+        <Grid x:Name="Keypad" RowDefinitions="*,*,*,*,*" ColumnDefinitions="*,*,*,*"
+              RowSpacing="10" ColumnSpacing="10" SizeChanged="OnKeypadSizeChanged">
+            <Button Grid.Row="0" Grid.Column="0" Text="AC" Style="{StaticResource FunctionKey}" Clicked="OnClearClicked"
+                    SemanticProperties.Description="Tout effacer" />
+            <Button Grid.Row="0" Grid.Column="1" Text="⌫" Style="{StaticResource FunctionKey}" Clicked="OnBackspaceClicked"
+                    SemanticProperties.Description="Effacer le dernier caractère" />
+            <Button Grid.Row="0" Grid.Column="2" Text="%" Style="{StaticResource FunctionKey}" Clicked="OnPercentClicked"
+                    SemanticProperties.Description="Pourcentage" />
+            <Button Grid.Row="0" Grid.Column="3" Text="÷" Style="{StaticResource OperatorKey}" Clicked="OnOperatorClicked" CommandParameter="/"
+                    SemanticProperties.Description="Diviser" />
+
+            <Button Grid.Row="1" Grid.Column="0" Text="7" Style="{StaticResource DigitKey}" Clicked="OnDigitClicked" />
+            <Button Grid.Row="1" Grid.Column="1" Text="8" Style="{StaticResource DigitKey}" Clicked="OnDigitClicked" />
+            <Button Grid.Row="1" Grid.Column="2" Text="9" Style="{StaticResource DigitKey}" Clicked="OnDigitClicked" />
+            <Button Grid.Row="1" Grid.Column="3" Text="×" Style="{StaticResource OperatorKey}" Clicked="OnOperatorClicked" CommandParameter="*"
+                    SemanticProperties.Description="Multiplier" />
+
+            <Button Grid.Row="2" Grid.Column="0" Text="4" Style="{StaticResource DigitKey}" Clicked="OnDigitClicked" />
+            <Button Grid.Row="2" Grid.Column="1" Text="5" Style="{StaticResource DigitKey}" Clicked="OnDigitClicked" />
+            <Button Grid.Row="2" Grid.Column="2" Text="6" Style="{StaticResource DigitKey}" Clicked="OnDigitClicked" />
+            <Button Grid.Row="2" Grid.Column="3" Text="−" Style="{StaticResource OperatorKey}" Clicked="OnOperatorClicked" CommandParameter="-"
+                    SemanticProperties.Description="Soustraire" />
+
+            <Button Grid.Row="3" Grid.Column="0" Text="1" Style="{StaticResource DigitKey}" Clicked="OnDigitClicked" />
+            <Button Grid.Row="3" Grid.Column="1" Text="2" Style="{StaticResource DigitKey}" Clicked="OnDigitClicked" />
+            <Button Grid.Row="3" Grid.Column="2" Text="3" Style="{StaticResource DigitKey}" Clicked="OnDigitClicked" />
+            <Button Grid.Row="3" Grid.Column="3" Text="+" Style="{StaticResource OperatorKey}" Clicked="OnOperatorClicked" CommandParameter="+"
+                    SemanticProperties.Description="Additionner" />
+
+            <Button Grid.Row="4" Grid.Column="0" Text="±" Style="{StaticResource DigitKey}" Clicked="OnSignClicked"
+                    SemanticProperties.Description="Changer de signe" />
+            <Button Grid.Row="4" Grid.Column="1" Text="0" Style="{StaticResource DigitKey}" Clicked="OnDigitClicked" />
+            <Button Grid.Row="4" Grid.Column="2" Text="," Style="{StaticResource DigitKey}" Clicked="OnDecimalClicked"
+                    SemanticProperties.Description="Virgule" />
+            <Button Grid.Row="4" Grid.Column="3" Text="=" Style="{StaticResource EqualsKey}" Clicked="OnEqualsClicked"
+                    SemanticProperties.Description="Égal" />
+        </Grid>
+
+        <!-- Historique : panneau superposé au pavé, affiché à la demande -->
+        <Border x:Name="HistoryPanel" IsVisible="False" BackgroundColor="{StaticResource CalcSurface}"
+                StrokeThickness="0" StrokeShape="RoundRectangle 24" Padding="16,12">
+            <Grid RowDefinitions="Auto,*" RowSpacing="8">
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label Text="Historique" FontFamily="OpenSansSemibold" FontSize="18"
+                           TextColor="{StaticResource CalcText}" VerticalOptions="Center" />
+                    <Button Grid.Column="1" Text="Effacer" Style="{StaticResource PillButton}"
+                            BackgroundColor="{StaticResource CalcFunction}" Clicked="OnClearHistoryClicked" />
+                </Grid>
+                <ScrollView Grid.Row="1">
+                    <VerticalStackLayout x:Name="HistoryList" Spacing="4">
+                        <BindableLayout.EmptyView>
+                            <Label Text="Aucun calcul pour l'instant." TextColor="{StaticResource CalcMuted}"
+                                   HorizontalOptions="Center" Margin="0,24" />
+                        </BindableLayout.EmptyView>
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="core:HistoryEntry">
+                                <Border StrokeThickness="0" BackgroundColor="{StaticResource CalcDigit}"
+                                        StrokeShape="RoundRectangle 14" Padding="14,8">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnHistoryItemTapped" />
+                                    </Border.GestureRecognizers>
+                                    <VerticalStackLayout Spacing="2">
+                                        <Label Text="{Binding Expression}" FontSize="14" TextColor="{StaticResource CalcMuted}"
+                                               HorizontalTextAlignment="End" LineBreakMode="HeadTruncation" />
+                                        <Label Text="{Binding Result}" FontSize="22" FontFamily="OpenSansSemibold"
+                                               TextColor="{StaticResource CalcText}" HorizontalTextAlignment="End"
+                                               LineBreakMode="HeadTruncation" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </ScrollView>
+            </Grid>
+        </Border>
+    </Grid>
+</ContentPage>
